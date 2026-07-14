@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>水烟换碳助手</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Noto Sans SC','Inter',sans-serif;background:#000;color:#f0f0f0;display:flex;flex-direction:column;user-select:none}
+:root{--gold:#f5c542;--gold-dim:rgba(245,197,66,.18);--gold-bg:rgba(245,197,66,.08);--wood:#1e1e20;--wood-lt:#2a2a2e;--wood-dk:#0e0e10;--bg:#000;--surface:#0e0e10;--text:#f0f0f0;--text-dim:#b0b0b0;--text-dim2:#808080;--red:#ff5544;--green:#3dd68c}
+.top-bar{background:var(--surface);border-bottom:1px solid var(--gold-dim);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:10}
+.app-title{font-size:1rem;font-weight:600;letter-spacing:.06em;color:var(--gold);display:flex;align-items:center;gap:8px}
+.top-btn{background:transparent;border:1px solid var(--gold-dim);color:var(--text-dim);width:36px;height:36px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.top-btn:hover{border-color:var(--gold);color:var(--gold);background:var(--gold-bg)}
+.mode-bar{display:flex;gap:4px;padding:10px 20px;background:var(--wood-dk);flex-shrink:0}
+.mode-btn{padding:8px 20px;border-radius:8px;border:none;background:transparent;color:var(--text-dim);font-family:inherit;font-size:.82rem;font-weight:500;cursor:pointer;transition:all .2s}
+.mode-btn:hover{color:var(--text);background:var(--wood-lt)}.mode-btn.active{background:var(--gold-bg);color:var(--gold)}
+.main-area{flex:1;overflow:hidden;position:relative}
+.view-pane{position:absolute;inset:0;display:none;overflow:hidden;padding:20px}
+.view-pane.active{display:flex;flex-direction:column}
+.floor-canvas-wrap{flex:1;position:relative;background:var(--wood-dk);border-radius:12px;border:1px solid var(--gold-dim);overflow:hidden;min-height:400px}
+.floor-canvas{position:relative;width:100%;height:100%;min-height:400px}
+.table-item{position:absolute;transition:box-shadow .2s;z-index:2;cursor:grab}
+.table-item:hover{z-index:5}.table-item.dragging{cursor:grabbing;z-index:100;transform:scale(1.06)}
+.table-item.dragging .table-card{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold-bg),0 12px 32px rgba(0,0,0,.7)}
+.table-card{background:var(--surface);border:1px solid var(--gold-dim);border-radius:8px;padding:10px 6px;text-align:center;min-width:80px;box-shadow:0 2px 8px rgba(0,0,0,.3);transition:all .2s}
+.table-item:not(.dragging):hover .table-card{border-color:rgba(245,197,66,.3);box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.table-card .table-name{font-size:.85rem;font-weight:600;color:var(--text)}
+.table-status{font-size:.65rem;margin-top:4px;padding:2px 8px;border-radius:4px;display:inline-block}
+.table-status.empty{color:var(--text-dim2);background:rgba(255,255,255,.06)}
+.table-status.occupied{color:var(--gold);background:var(--gold-bg)}
+.drag-handle{position:absolute;top:-6px;right:-6px;width:20px;height:20px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:grab;z-index:10;border:2px solid var(--bg);color:var(--bg);font-size:.7rem;opacity:0;transition:opacity .2s}
+.table-item:hover .drag-handle{opacity:1}
+.delete-handle{position:absolute;top:-6px;left:-6px;width:20px;height:20px;background:var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;border:2px solid var(--bg);color:#fff;font-size:.7rem;opacity:0;transition:opacity .2s}
+.table-item:hover .delete-handle{opacity:1}
+.drag-hint{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:.6rem;color:var(--text-dim2);pointer-events:none;opacity:0;transition:opacity .3s;white-space:nowrap}
+.table-item:hover .drag-hint{opacity:1}
+.timer-badge{margin-top:4px;padding:2px 6px;border-radius:4px;font-size:.65rem;font-weight:500;display:inline-block}
+.timer-badge.running{color:#5cd9e6;background:rgba(92,217,230,.15)}
+.timer-badge.alert{color:var(--red);background:rgba(224,96,64,.12);animation:pulse 1s infinite}
+.timer-badge.countdown{color:#f0c848;background:rgba(240,200,72,.15)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}.table-item.alert{z-index:15}.table-item.alert .table-card{border-color:var(--red);animation:alertShake .7s ease-in-out infinite,alertGlow .7s ease-in-out infinite}.table-item.alert .table-card .table-status.occupied{background:rgba(255,85,68,.3);color:#ff7766;font-weight:600}@keyframes alertGlow{0%,100%{box-shadow:0 0 10px rgba(255,85,68,.35),0 0 0 3px rgba(255,85,68,.2);background:rgba(255,85,68,.06)}50%{box-shadow:0 0 40px rgba(255,85,68,.85),0 0 0 6px rgba(255,85,68,.45);background:rgba(255,85,68,.2)}}@keyframes alertShake{0%,100%{transform:scale(1)}15%{transform:scale(1.12)}30%{transform:scale(1.12) translateX(-3px)}45%{transform:scale(1.06) translateX(3px)}60%{transform:scale(.96) translateX(-2px)}75%{transform:scale(1.03) translateX(2px)}90%{transform:scale(1) translateX(0)}}
+.settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;display:none;backdrop-filter:blur(4px)}
+.settings-overlay.open{display:block}
+.settings-panel{position:fixed;top:0;right:0;width:400px;max-width:92vw;height:100%;background:var(--surface);border-left:1px solid var(--gold-dim);z-index:51;transform:translateX(100%);transition:transform .3s ease;display:flex;flex-direction:column}
+.settings-panel.open{transform:translateX(0)}
+.settings-header{padding:20px;border-bottom:1px solid var(--gold-dim);display:flex;align-items:center;justify-content:space-between}
+.settings-header h2{font-size:1rem;font-weight:600;color:var(--gold)}
+.settings-close{width:32px;height:32px;border:none;background:var(--wood-lt);border-radius:8px;color:var(--text-dim);cursor:pointer}
+.settings-body{flex:1;overflow-y:auto;padding:20px 20px 40px}
+.settings-body h3{font-size:.82rem;font-weight:500;color:var(--text-dim);margin-bottom:12px;letter-spacing:.04em}
+.settings-sec{padding:16px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.settings-sec:last-child{border-bottom:none}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:.75rem;color:var(--text-dim2);margin-bottom:4px}
+.form-group input[type="text"],.form-group input[type="number"],.form-group select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--wood-lt);background:var(--wood-dk);color:var(--text);font-family:inherit;font-size:.85rem}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--gold)}
+.form-row{display:flex;gap:10px}
+.form-row>.form-group{flex:1}
+.toggle-wrap{display:flex;align-items:center;justify-content:space-between;padding:8px 0}
+.toggle-wrap label{font-size:.85rem;color:var(--text);margin:0}
+.toggle{position:relative;width:44px;height:24px;flex-shrink:0;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:var(--wood-lt);border-radius:12px;transition:all .2s}
+.toggle-slider:before{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;background:var(--text-dim);border-radius:50%;transition:all .2s}
+.toggle input:checked+.toggle-slider{background:var(--gold-dim)}
+.toggle input:checked+.toggle-slider:before{background:var(--gold);transform:translateX(20px)}
+.settings-footer{padding:16px 20px;border-top:1px solid var(--gold-dim);display:flex;gap:8px}
+.btn{padding:10px 20px;border-radius:8px;border:none;font-family:inherit;font-size:.8rem;font-weight:500;cursor:pointer;transition:all .2s}
+.btn-gold{background:var(--gold);color:#000}.btn-gold:hover{background:#ffd666}
+.btn-wood{background:var(--wood-lt);color:var(--text-dim)}.btn-wood:hover{color:var(--text)}
+.btn-red{background:rgba(224,96,64,.15);color:var(--red);border:1px solid rgba(224,96,64,.25)}.btn-red:hover{background:rgba(224,96,64,.25)}.btn-green{background:rgba(61,214,140,.15);color:#3dd68c;border:1px solid rgba(61,214,140,.25)}.btn-green:hover{background:rgba(61,214,140,.25)}
+.btn-sm{padding:6px 14px;font-size:.75rem}
+.w-full{width:100%}
+.mt-8{margin-top:8px}
+.table-list-settings{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.table-list-item{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--wood-dk);border-radius:8px;border:1px solid transparent}
+.table-list-item:hover{border-color:var(--gold-dim)}
+.table-list-item .tl-name{flex:1;font-size:.85rem;font-weight:500}
+.table-list-item .tl-pos{font-size:.75rem;color:var(--text-dim2)}
+.table-list-item button{width:28px;height:28px;border:none;background:rgba(224,96,64,.12);border-radius:6px;color:var(--red);cursor:pointer}
+.table-list-item button:hover{background:rgba(224,96,64,.25)}
+.sec-label{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:12px}
+.timer-popup{position:absolute;z-index:20;background:var(--surface);border:1px solid var(--gold-dim);border-radius:12px;padding:16px;min-width:200px;max-width:240px;box-shadow:0 8px 32px rgba(0,0,0,.6);display:none}
+.timer-popup.open{display:block}
+.timer-popup h3{font-size:.9rem;color:var(--gold);margin-bottom:8px;text-align:center}
+.timer-popup .time-display{font-size:1.8rem;font-weight:600;color:var(--text);text-align:center;font-variant-numeric:tabular-nums;margin:4px 0}
+.timer-popup .timer-label{font-size:.65rem;color:var(--text-dim2);text-align:center;margin-bottom:8px}
+.timer-popup .timer-progress{height:4px;background:var(--wood-lt);border-radius:2px;margin-bottom:8px;overflow:hidden}
+.timer-popup .timer-progress-bar{height:100%;border-radius:2px;transition:width .5s}
+.timer-popup .tp-actions{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-dim2);gap:12px}
+.empty-state svg{opacity:.3}.empty-state p{font-size:.85rem}
+.toast-container{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;gap:8px}
+.toast{background:#1c1c1e;border:1px solid var(--gold);border-radius:10px;padding:12px 20px;font-size:.85rem;color:var(--text);box-shadow:0 4px 24px rgba(0,0,0,.5);animation:slideDown .3s ease;max-width:360px;text-align:center}
+.toast.alert{border-color:var(--red)}.toast.success{border-color:var(--green)}
+@keyframes slideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--wood-lt);border-radius:2px}#viewTimer .drag-handle,#viewTimer .delete-handle,#viewTimer .drag-hint{display:none!important}
+</style>
+</head>
+<body>
+<div class="top-bar"><div class="app-title"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-4-2v12"/><path d="M9 9v.01"/><path d="M9 13v.01"/><path d="M9 17v.01"/></svg>水烟换碳助手</div><button class="top-btn" id="btnSettings" title="后台设置">&#9881;</button><button class="top-btn" id="btnEndAll" title="结束所有计时" style="width:auto;padding:0 14px;white-space:nowrap;flex-shrink:0">结束全部</button></div>
+<div class="mode-bar"><button class="mode-btn active" data-mode="layout">&#127968; 桌台模式</button><button class="mode-btn" data-mode="timer">&#9201; 计时模式</button></div>
+<div class="main-area">
+<div class="view-pane active" id="viewLayout"><div class="floor-canvas-wrap"><div class="floor-canvas" id="floorLayout"><div class="empty-state" id="emptyLayout"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg><p>还没有添加桌台，点击右上角 &#9881; 开始设置</p></div></div></div></div>
+<div class="view-pane" id="viewTimer"><div class="floor-canvas-wrap"><div class="floor-canvas" id="floorTimer"><div class="empty-state" id="emptyTimer"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><p>请先在后台设置中添加桌台</p></div></div></div></div>
+</div>
+<div class="settings-overlay" id="settingsOverlay"></div>
+<div class="settings-panel" id="settingsPanel">
+<div class="settings-header"><h2>后台设置</h2><button class="settings-close" id="settingsClose">&times;</button></div>
+<div class="settings-body">
+<div class="settings-sec"><div class="sec-label">&#128188; 桌台管理</div>
+<div class="form-group"><label>桌台名称</label><input type="text" id="newTableName" placeholder="例如：A01 / 卡座1" value="桌1" /></div>
+<div class="form-row"><div class="form-group"><label>形状</label><select id="newTableShape"><option value="rect">矩形</option><option value="round">圆形</option></select></div>
+<div class="form-group"><label>&nbsp;</label><button class="btn btn-gold w-full" id="btnAddTable" style="padding:10px">+ 添加</button></div></div>
+<div id="tableList" class="table-list-settings"></div>
+<button class="btn btn-wood w-full mt-8" id="btnClearAll">清空所有桌台</button>
+</div>
+<div class="settings-sec"><div class="sec-label">&#9200; 计时设置</div>
+<div class="form-group"><label>换碳提醒时间（分钟）</label>
+<div class="form-row"><div class="form-group" style="margin:0"><input type="number" id="setAlertMin" min="10" max="120" value="40" /></div>
+<div class="form-group" style="margin:0;flex:0 0 auto"><span style="display:block;padding:10px 0 0;font-size:.8rem;color:var(--text-dim2)">分钟</span></div></div></div>
+<div class="form-group"><label>计时模式</label>
+<select id="setTimerMode"><option value="countup">正计时（从0开始计时）</option><option value="countdown">倒计时（显示剩余时间）</option></select></div>
+<div class="form-group" id="countdownDurationGroup"><label>倒计时总时长（分钟）</label>
+<input type="number" id="setCountdownMin" min="10" max="180" value="45" /></div>
+<div class="toggle-wrap"><label>声音提醒</label>
+<label class="toggle"><input type="checkbox" id="setSoundAlert" checked /><span class="toggle-slider"></span></label></div>
+<div class="toggle-wrap"><label>换碳后自动开始新计时</label>
+<label class="toggle"><input type="checkbox" id="setAutoRestart" /><span class="toggle-slider"></span></label></div>
+</div>
+<div class="settings-sec"><div class="sec-label">&#128161; 使用提示</div>
+<p style="font-size:.75rem;color:var(--text-dim2);line-height:1.7">&#8226; 桌台模式：直接拖动桌台调整位置<br />&#8226; 计时模式：点击桌台「+ 加水烟」开始计时<br />&#8226; 正计时：从0开始，到设置时间提醒换碳<br />&#8226; 倒计时：从设定时长倒减，归零提醒换碳<br />&#8226; 数据自动保存在本地，刷新不丢失</p>
+</div>
+</div>
+<div class="settings-footer"><button class="btn btn-wood w-full" id="btnSaveLayout">保存设置</button></div>
+</div>
+<div class="toast-container" id="toastContainer"></div>
+<script>
+var tables=[],nextId=1,timerState={},dragId=null,dragOffX=0,dragOffY=0,isDragging=false;
+var timerSettings={alertMinutes:40,mode:'countup',countdownMinutes:45,soundEnabled:true,autoRestart:false};
+function playAlert(){try{var ctx=new(window.AudioContext||window.webkitAudioContext)();var osc=ctx.createOscillator();var g=ctx.createGain();osc.connect(g);g.connect(ctx.destination);osc.frequency.value=880;osc.type='sine';g.gain.setValueAtTime(.3,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.3);osc.start(ctx.currentTime);osc.stop(ctx.currentTime+.3)}catch(e){}}
+function loadState(){try{var v=localStorage.getItem('hookahVer');if(v!=='v2'){localStorage.clear();localStorage.setItem('hookahVer','v2')}var d=JSON.parse(localStorage.getItem('hookahManager'));if(d){if(d.tables)tables=d.tables;if(d.nextId)nextId=d.nextId;if(d.timerState)timerState=d.timerState;if(d.timerSettings)Object.assign(timerSettings,d.timerSettings)}}catch(e){}}
+function saveState(){var c={tables:tables,nextId:nextId,timerState:{},timerSettings:timerSettings};Object.entries(timerState).forEach(function(e){c.timerState[e[0]]={tableId:e[1].tableId,hookahs:e[1].hookahs.map(function(h){return{id:h.id,startTime:h.startTime,active:h.active,alertShown:h.alertShown,changeCount:h.changeCount}})}});localStorage.setItem('hookahManager',JSON.stringify(c))}
+function renderAll(){renderLayoutView();renderTimerView();renderTableList()}
+function renderLayoutView(){var c=document.getElementById('floorLayout'),e=document.getElementById('emptyLayout');c.querySelectorAll('.table-item').forEach(function(el){el.remove()});if(tables.length===0){e.style.display='flex';return}e.style.display='none';tables.forEach(function(t){c.appendChild(createTableElement(t,'layout'))})}
+function renderTimerView(){var c=document.getElementById('floorTimer'),e=document.getElementById('emptyTimer');c.querySelectorAll('.table-item').forEach(function(el){el.remove()});if(tables.length===0){e.style.display='flex';return}e.style.display='none';tables.forEach(function(t){c.appendChild(createTableElement(t,'timer'))})}
+function fmtTime(m,s){return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')}
+function createTableElement(t,mode){var d=document.createElement('div');d.className='table-item';d.dataset.id=t.id;d.style.left=t.x+'px';d.style.top=t.y+'px';var sp=t.shape||'rect';var w=t.w||100;var h=sp==='round'?100:(t.h||80);d.style.width=w+'px';if(sp!=='round')d.style.height=h+'px';var ts=timerState[t.id];var hk=ts?ts.hookahs:[];var ac=hk.filter(function(x){return x.active});var am=timerSettings.alertMinutes;var st=ac.length?'<span class="table-status occupied">使用中</span>':'<span class="table-status empty">空闲</span>';var th='',ha=false;if(mode==='timer'&&ac.length){var n=Date.now();ac.forEach(function(h){if(!h.startTime)return;var e=n-h.startTime;var mf=Math.floor(e/6e4);var s=Math.floor((e%6e4)/1e3);var isAlert=false;var display='';if(timerSettings.mode==='countdown'){var remaining=am*60-mf*60-s;if(remaining<0)remaining=0;var rm=Math.floor(remaining/60);var rs=remaining%60;display=fmtTime(rm,rs);isAlert=remaining<=60}else{display=fmtTime(mf,s);isAlert=mf>=am}var cl=isAlert?'alert':'running';if(timerSettings.mode==='countdown')cl='countdown';th+='<div class="timer-badge '+cl+'">'+(timerSettings.mode==='countdown'?'&#9201; ':'&#128683; ')+display+'</div>';if(h.changeCount)th+=('<div style="font-size:.6rem;color:var(--text-dim2);margin-top:2px">换碳 '+h.changeCount+'次</div>');})}var ex='';if(mode==='timer'){ex+='<div style="margin-top:6px;display:flex;gap:4px;justify-content:center;flex-wrap:wrap"><button class="btn btn-gold btn-sm" data-action="add-hookah" style="padding:3px 10px;font-size:.7rem">+ 加水烟</button>';if(ac.length)ex+='<button class="btn btn-red btn-sm" data-action="clear-hookah" style="padding:3px 10px;font-size:.7rem">结束</button>';if(ha)ex+='<button class="btn btn-green" data-action="reset-hookah" style="padding:3px 10px;font-size:.7rem">换碳完成 ✓</button>';ex+='</div>'}var rs=sp==='round'?'border-radius:50%;aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px 4px':'';d.innerHTML='<div class="drag-handle">&#9776;</div><div class="delete-handle" data-action="delete-table">&#10005;</div><div class="drag-hint">拖拽调整位置</div><div class="table-card" style="'+rs+'"><div style="font-size:.8rem;font-weight:600;color:var(--text);margin:2px 0">'+t.name+'</div>'+st+th+'</div>'+ex;if(mode==='timer'){var _at=timerState[t.id];if(_at){_at.hookahs.forEach(function(_h2){if(_h2.active&&_h2.startTime&&(Date.now()-_h2.startTime)/6e4>=timerSettings.alertMinutes*((_h2.changeCount||0)+1)){d.classList.add('alert')}})};d.querySelector('[data-action="add-hookah"]')?.addEventListener('click',function(e){e.stopPropagation();addHookahToTable(t.id)});d.querySelector('[data-action="reset-hookah"]')?.addEventListener('click',function(e){e.stopPropagation();var _ts=timerState[t.id];if(_ts){_ts.hookahs.forEach(function(_h){if(_h.active&&_h.alertShown){_h.changeCount=(_h.changeCount||0)+1;_h.alertShown=false}});document.querySelectorAll('.table-item.alert').forEach(function(e){e.classList.remove('alert')});saveState();renderAll();toast('✅ 已换碳，重新计时','success')}});d.querySelector('[data-action="clear-hookah"]')?.addEventListener('click',function(e){e.stopPropagation();clearHookahsOnTable(t.id)});d.querySelector('.table-card')?.addEventListener('click',function(e){if(e.target.closest('button'))return;showTimerDetail(t.id,d)})}if(mode==='layout'){d.querySelector('[data-action="delete-table"]')?.addEventListener('click',function(e){e.stopPropagation();deleteTable(t.id)});function startDrag(e){isDragging=true;dragId=t.id;var r=d.getBoundingClientRect();dragOffX=e.clientX-r.left;dragOffY=e.clientY-r.top;d.classList.add('dragging');e.preventDefault()}d.addEventListener('mousedown',function(e){if(e.target.closest('button')||e.target.closest('.delete-handle'))return;startDrag(e)});d.querySelector('.drag-handle')?.addEventListener('mousedown',function(e){e.stopPropagation();startDrag(e)});}return d}
+function renderTableList(){var l=document.getElementById('tableList');if(tables.length===0){l.innerHTML='<p style="font-size:.8rem;color:var(--text-dim2);padding:8px 0">暂无桌台，点击上方添加</p>';return}var h='';tables.forEach(function(t){h+='<div class="table-list-item"><span class="tl-name">'+t.name+'</span><span class="tl-pos">('+t.x+', '+t.y+')</span><button onclick="deleteTable('+t.id+')">&#10005;</button></div>'});l.innerHTML=h}
+function addTable(n,s){var id=nextId++;var idx=tables.length;var x=40+(idx%3)*140;var y=40+Math.floor(idx/3)*120;tables.push({id:id,name:n,label:String(id).padStart(2,'0'),x:x,y:y,w:100,h:80,shape:s});timerState[id]={tableId:id,hookahs:[]};saveState();renderAll();toast('已添加桌台「'+n+'」')}
+function deleteTable(id){tables=tables.filter(function(t){return t.id!==id});delete timerState[id];saveState();renderAll();toast('已删除桌台')}
+function addHookahToTable(tid){var ts=timerState[tid];if(!ts)return;ts.hookahs.push({id:Date.now(),startTime:Date.now(),active:true,alertShown:false,changeCount:0});saveState();renderAll();toast('&#128683; 已开始计时','success')}
+function clearHookahsOnTable(tid){var ts=timerState[tid];if(!ts)return;ts.hookahs=[];saveState();renderAll();closeTimerDetail();toast('已结束该桌所有水烟计时')}
+function stopHookah(tid,hid){var ts=timerState[tid];if(!ts)return;var hadActive=ts.hookahs.some(function(h){return h.active});ts.hookahs=ts.hookahs.filter(function(h){return h.id!==hid});saveState();renderAll();if(ts.hookahs.length===0&&hadActive&&timerSettings.autoRestart)addHookahToTable(tid);if(!ts.hookahs.length)closeTimerDetail();toast('已结束一个水烟计时')}
+function showTimerDetail(tid,el){closeTimerDetail();var d=document.createElement('div');d.className='timer-popup open';d.dataset.tableId=tid;var r=el.getBoundingClientRect();var cvs=el.closest('.floor-canvas-wrap');var cr=cvs.getBoundingClientRect();d.style.left=Math.min(r.left-cr.left+r.width+10,cr.width-230)+'px';d.style.top=Math.max(r.top-cr.top,0)+'px';updateTimerDetailContent(tid,d);cvs.appendChild(d)}
+function updateTimerDetailContent(tid,d){var ts=timerState[tid];var am=timerSettings.alertMinutes;var isCountdown=timerSettings.mode==='countdown';if(!ts||!ts.hookahs.length){d.innerHTML='<h3>暂无计时</h3><p style="font-size:.8rem;color:var(--text-dim2);text-align:center">点击「+ 加水烟」开始计时</p><div class="tp-actions"><button class="btn btn-wood btn-sm" onclick="closeTimerDetail()">关闭</button></div>';return}var tb=tables.find(function(t){return t.id===tid});var now=Date.now();var h='<h3>'+(tb?tb.name:'桌台')+' '+(isCountdown?'倒计时':'水烟计时')+'</h3>';ts.hookahs.forEach(function(h2){if(!h2.active)return;var el=now-h2.startTime;var mf=Math.floor(el/6e4);var s=Math.floor((el%6e4)/1e3);var display,label,pct,isAlert;if(isCountdown){var remaining=am*60-mf*60-s;if(remaining<0)remaining=0;var rm=Math.floor(remaining/60);var rs=remaining%60;display=fmtTime(rm,rs);label='剩余时间';pct=Math.min((am*60-remaining)/(am*60)*100,100);isAlert=remaining<=60}else{display=fmtTime(mf,s);label='已使用时间';pct=Math.min((mf+s/60)/(am*((h2.changeCount||0)+1))*100,100);isAlert=mf>=am}var bg=isAlert?'var(--red)':'var(--gold)';if(isCountdown&&!isAlert)bg='#f0c848';h+='<div style="border:1px solid var(--gold-dim);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--wood-dk)"><div class="time-display" style="font-size:1.4rem;color:'+(isAlert?'var(--red)':'var(--text)')+'">'+display+'</div>'+(h2.changeCount?'<div style="font-size:.65rem;color:var(--text-dim2);text-align:center;margin:2px 0">换碳 '+h2.changeCount+'次</div>':'')+'<div class="timer-label">'+label+'</div><div class="timer-progress"><div class="timer-progress-bar" style="width:'+pct+'%;background:'+bg+'"></div></div><div style="display:flex;justify-content:space-between;font-size:.65rem;color:var(--text-dim2)"><span>0:00</span><span>'+(isAlert?'&#9888; 建议换碳':(isCountdown?'总时长 '+am+'min':'目标 '+am+'min'))+'</span></div><div class="tp-actions" style="margin-top:8px"><button class="btn btn-red btn-sm" onclick="stopHookah('+tid+','+h2.id+')">结束计时</button></div></div>'});h+='<div class="tp-actions"><button class="btn btn-wood btn-sm" onclick="closeTimerDetail()">关闭</button></div>';d.innerHTML=h}
+function closeTimerDetail(){document.querySelectorAll('.timer-popup').forEach(function(el){el.remove()})}
+function toast(msg,tp){var c=document.getElementById('toastContainer'),e=document.createElement('div');e.className='toast'+(tp?' '+tp:'');e.textContent=msg;c.appendChild(e);setTimeout(function(){e.remove()},3500)}
+document.querySelectorAll('.mode-btn').forEach(function(b){b.addEventListener('click',function(){document.querySelectorAll('.mode-btn').forEach(function(x){x.classList.remove('active')});b.classList.add('active');document.querySelectorAll('.view-pane').forEach(function(v){v.classList.remove('active')});document.getElementById(b.dataset.mode==='layout'?'viewLayout':'viewTimer').classList.add('active');closeTimerDetail();renderAll()})});
+document.getElementById('btnSettings').addEventListener('click',function(){document.getElementById('settingsOverlay').classList.add('open');document.getElementById('settingsPanel').classList.add('open');renderAll();document.getElementById('setAlertMin').value=timerSettings.alertMinutes;document.getElementById('setTimerMode').value=timerSettings.mode;document.getElementById('setCountdownMin').value=timerSettings.countdownMinutes;document.getElementById('setSoundAlert').checked=timerSettings.soundEnabled;document.getElementById('setAutoRestart').checked=timerSettings.autoRestart;toggleCountdownGroup()});
+document.getElementById('setTimerMode').addEventListener('change',toggleCountdownGroup);
+function toggleCountdownGroup(){var g=document.getElementById('countdownDurationGroup');g.style.display=document.getElementById('setTimerMode').value==='countdown'?'block':'none'}
+function closeSettings(){document.getElementById('settingsOverlay').classList.remove('open');document.getElementById('settingsPanel').classList.remove('open');renderAll()}
+document.getElementById('settingsClose').addEventListener('click',closeSettings);
+document.getElementById('settingsOverlay').addEventListener('click',closeSettings);
+document.getElementById('btnSaveLayout').addEventListener('click',function(){timerSettings.alertMinutes=parseInt(document.getElementById('setAlertMin').value)||40;timerSettings.mode=document.getElementById('setTimerMode').value;timerSettings.countdownMinutes=parseInt(document.getElementById('setCountdownMin').value)||45;timerSettings.soundEnabled=document.getElementById('setSoundAlert').checked;timerSettings.autoRestart=document.getElementById('setAutoRestart').checked;saveState();toast('设置已保存','success');closeSettings()});
+document.getElementById('btnAddTable').addEventListener('click',function(){var n=document.getElementById('newTableName'),s=document.getElementById('newTableShape').value,v=n.value.trim();if(!v)v='桌'+nextId;addTable(v,s);n.value='桌'+nextId});
+document.getElementById('newTableName').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('btnAddTable').click()});
+document.getElementById('btnClearAll').addEventListener('click',function(){if(tables.length===0)return;if(!confirm('确定要清空所有桌台吗？相关计时数据也会被清除。'))return;tables=[];timerState={};nextId=1;saveState();renderAll();toast('已清空所有桌台')});
+document.addEventListener('mousemove',function(e){if(!isDragging||dragId===null)return;var t=tables.find(function(x){return x.id===dragId});if(!t)return;var cvs=document.getElementById('floorLayout');var cr=cvs.getBoundingClientRect();var x=e.clientX-cr.left-dragOffX;var y=e.clientY-cr.top-dragOffY;x=Math.max(0,Math.min(x,cr.width-100));y=Math.max(0,Math.min(y,cr.height-80));t.x=Math.round(x);t.y=Math.round(y);var item=cvs.querySelector('.table-item[data-id="'+dragId+'"]');if(item){item.style.left=t.x+'px';item.style.top=t.y+'px'}});
+document.addEventListener('mouseup',function(){if(isDragging&&dragId!==null){saveState();renderTableList()}isDragging=false;dragId=null;document.querySelectorAll('.table-item.dragging').forEach(function(el){el.classList.remove('dragging')})});
+setInterval(function(){var now=Date.now(),ch=false,am=timerSettings.alertMinutes;Object.values(timerState).forEach(function(ts){ts.hookahs.forEach(function(h){if(!h.active||!h.startTime)return;var m=(now-h.startTime)/6e4;if(m>=am*((h.changeCount||0)+1)&&!h.alertShown){h.alertShown=true;ch=true;var tb=tables.find(function(t){return t.id===ts.tableId});var msg='&#9888; '+(tb?tb.name:'某桌')+' 已超过'+am+'分钟，建议换碳！';toast(msg,'alert');if(timerSettings.soundEnabled)playAlert()}if(m>=am+5&&timerSettings.autoRestart){h.active=false;var newId=Date.now();ts.hookahs.push({id:newId,startTime:Date.now(),active:true,alertShown:false});ch=true}})});if(ch)saveState();renderTimerView()},1000);
+function endAllTimers(){var count=0;Object.values(timerState).forEach(function(ts){count+=ts.hookahs.filter(function(h){return h.active}).length;ts.hookahs=[]});saveState();renderAll();closeTimerDetail();if(count>0){toast("已结束全部 "+count+" 个计时","success")}else{toast("没有正在进行的计时")}}document.getElementById("btnEndAll")?.addEventListener("click",endAllTimers);
+loadState();renderAll();
+</script>
+</body>
+</html>
